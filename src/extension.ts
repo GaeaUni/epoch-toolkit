@@ -1,26 +1,55 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import find from 'find-process';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+
 export function activate(context: vscode.ExtensionContext) {
+    console.log('Your extension "vscode-debug-helper" is now active!');
+    const configs =  vscode.workspace.getConfiguration('launch').get<any[]>('configurations');
+    const debugNames = new Set(configs?.map(config => config.name as string));
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "epoch-toolkit" is now active!');
+    // 监听调试会话的结束
+    context.subscriptions.push(vscode.debug.onDidTerminateDebugSession(session => {
+        console.log(`Debug session terminated: ${session.name}`);
+        // 任何调试会话结束时，都会停止调试
+        if (debugNames.has(session.name)) {
+            vscode.debug.stopDebugging();
+        }
+    }));
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('epoch-toolkit.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from epoch-toolkit!');
-	});
-
-	context.subscriptions.push(disposable);
+    let disposable = vscode.commands.registerCommand('extension.findElectronProcesses', async () => {
+        // 在这里执行你的 PID 查找逻辑
+        const pid = await waitForProcess("Electron"); // 例如，你可以调用一个函数来查找 PID
+        return pid;
+      });
+    
+      context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+// Helper function to wait for a process to appear
+async function waitForProcess(processName: string): Promise<string> {
+    let found = false;
+    let attempt = 0;
+
+    while (!found || attempt < 10) {
+        attempt++;
+        console.log(`Checking for process, attempt ${attempt}...`);
+
+        const list = await find('name', processName, true);
+        const electron = list.find(p => p.cmd.includes('node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'));
+        if (electron) {
+            console.log(`Found process with name ${processName} and pid ${electron.pid}.`);
+            return `${electron.pid}`;
+        }
+
+        // Wait for a short period before checking again
+        await new Promise(resolve => setTimeout(resolve, 1000)); // adjust the interval as needed
+    }
+
+    return "${command:pickProcess}"; // Not found
+}
+
+export function deactivate() {
+    console.log('Your extension "vscode-debug-helper" is now inactive.');
+}
