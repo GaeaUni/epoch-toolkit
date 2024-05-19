@@ -32,7 +32,7 @@ async function waitForProcess(processName: string): Promise<string> {
     let found = false;
     let attempt = 0;
 
-    while (!found || attempt < 10) {
+    while (!found && attempt < 10) {
         attempt++;
         console.log(`Checking for process, attempt ${attempt}...`);
 
